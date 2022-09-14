@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>MPM</title>
+
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/materialdesignicons.min.css" />
+
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css" />
+
+    <script src="js/go.js"></script>
+
+    <script src="js/jquery-3.1.1.min.js"></script>
+
+    <script src="bootstrap/js/bootstrap.min.js"></script>
+
+    <script type="text/javascript">
+      $(document).ready(function () {
+        $("#addModal").on("shown.bs.modal", function () {
+          $("#myInput").trigger("focus");
+        });
+      });
+
+      //classe de base
+      function Noeud(key, duree) {
+        this.duree = duree;
+        this.key = key;
+        this.LNB = 0;
+        this.RNB = null;
+        this.marge = 0;
+
+        this.boucle = 0;
+
+        this.calculer = false;
+
+        this.debut = false;
+        this.fin = false;
+
+        this.next = [];
+        this.previous = [];
+      }
+
+      //classe de sauvegarde
+      function Petit(key, duree) {
+        this.key = key;
+        this.duree = duree;
+        this.chemin = false;
+        this.calculer = false;
+      }
+
+      // variable Globale
+      var G = null;
+      var myDiagram = null;
+      var data = [];
+      var lastAction = null;
+      var dateAuPlusTot = false;
+      var dateAuPlusTard = false;
+      var chemin = false;
+      var timing = 1000;
+
+      //initialisation de debut et de fin dans le table de base
+      data.push(new Noeud("DEB", 0));
+      data.push(new Noeud("FIN", 0));
+
+      //fonction d'initialisation
+      function initialisation() {
+        G = go.GraphObject.make;
+
+        myDiagram = G(go.Diagram, "MainZone", {
+          initialDocumentSpot: go.Spot.LeftCenter,
+        });
+
+        myDiagram.grid.visible = true;
+        myDiagram.toolManager.draggingTool.isGridSnapEnabled = true;
+        myDiagram.toolManager.resizingTool.isGridSnapEnabled = true;
+
+        // snap to every other point both vertically and horizontally
+        // (the default background grid has a cell size of 10x10)
+        myDiagram.toolManager.draggingTool.gridSnapCellSize = new go.Size(
+          20,
+          20
+        );
+
+        //Model de base
+        myDiagram.nodeTemplate = G(
+          go.Node,
+          "Position",
+          // cercle de base
+          G(
+            go.Shape,
+            "Circle",
+            {
+              position: new go.Point(0, 0),
+              name: "C",
+              fill: "white",
+              width: 75,
+              height: 75,
+            },
+            new go.Binding("fill", "color")
+          ),
+          //text a gauche
+          G(
+            go.TextBlock,
+            {
+              position: new go.Point(5, 12),
+              font: "18pt serif",
+              stroke: "red",
+              width: 30,
+              textAlign: "center",
+            },
+            new go.Binding("text", "LNB")
+          ),
+          //ligne vertical
+          G(go.Shape, "LineV", {
+            position: new go.Point(12.5, 0),
+            name: "VL",
+            height: 47,
+          }),
+          //text a droite
+          G(
+            go.TextBlock,
+            {
+              position: new go.Point(40, 12),
+              font: "18pt serif",
+              stroke: "blue",
+              width: 30,
+              textAlign: "center",
+            },
+            new go.Binding("text", "RNB")
+          ),
+          //ligne horizontal
+          G(go.Shape, "LineH", {
+            position: new go.Point(1, 22),
+            name: "HL",
+            width: 73,
+          }),
+          //text en bas
+          G(
+            go.TextBlock,
+            {
+              position: new go.Point(13, 45),
+              font: "bold 18pt serif",
+              textAlign: "center",
+              width: 50,
+              height: 25,
+            },
+            new go.Binding("text", "key")
+          ),
+          // carre marge
+          G(
+            go.Shape,
+            "RoundedRectangle",
+            {
+              position: new go.Point(25, -17),
+              name: "C",
+              fill: null,
+              width: 25,
+              height: 20,
+              stroke: null,
+            },
+            new go.Binding("fill", "RColor")
+          ),
+          //text en bas
+          G(
+            go.TextBlock,
+            {
+              position: new go.Point(22, -13),
+              width: 30,
+              textAlign: "center",
+              stroke: "white",
+            },
+            new go.Binding("text", "marge"),
+            new go.Binding("stroke", "margeC")
+          )
+        );
+
+        //Model des lignes
+        myDiagram.linkTemplate = G(
+          go.Link,
+          G(go.Shape, new go.Binding("stroke", "FColor")),
+          G(
+            go.Shape,
+            { toArrow: "Standard" },
+            new go.Binding("stroke", "FColor"),
+            new go.Binding("fill", "FColor")
+          ),
+          G(
+            go.TextBlock,
+            { segmentOffset: new go.Point(0, -10) },
+            new go.Binding("text", "text")
+          )
+        );
+
+        var model = G(go.GraphLinksModel);
+        model.nodeDataArray = [
+          { key: "DEB", color: "lightgreen" },
+          { key: "FIN", color: "lightgreen" },
+        ];
+
+        myDiagram.model = model;
+      }
+    </script>
+  </head>
+  <body onload="initialisation()">
+    <div class="">
+      <!-- <div class="row">
+        <div class="col">
+          <h1 class="display-4 text-center neon-red-text m-4">
+            <span class="p-2 neon-red-box" style="border-radius: 15px"
+              >Ordonancement MPM</span
+            >
+          </h1>
+        </div>
+      </div> -->
+      <div class="row">
+        <div class="col">
+          <div
+            id="MainZone"
+            class="m-2 neon-red-box"
+            style="border-radius: 5px"
+          ></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col d-flex flex-row justify-content-center">
+          <button
+            type="button"
+            class="m-2 special-btn neon-blue-box"
+            data-toggle="modal"
+            data-target="#addModal"
+          >
+            Nouvelle tache
+            <!-- <i class="mdi mdi-plus"></i> -->
+          </button>
+          <button
+            type="button"
+            class="m-2 special-btn neon-green-box"
+            onclick="play()"
+          >
+            Lancer
+            <!-- <i class="mdi mdi-power"></i> -->
+          </button>
+          <button
+            type="button"
+            class="m-2 special-btn neon-red-button"
+            onclick="refresh()"
+          >
+            Reinitialiser
+            <!-- <i class="mdi mdi-refresh"></i> -->
+          </button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <table
+            class="table table-sm table-bordered m-2 table-dark neon-red-box"
+          >
+            <tbody>
+              <tr id="TacheZone">
+                <td>Tâche</td>
+              </tr>
+              <tr id="DureeZone">
+                <td>Durée</td>
+              </tr>
+              <tr id="TacheAntZone">
+                <td>Tâche Anterieur</td>
+              </tr>
+              <tr id="TacheSucZone">
+                <td>Tâche Successeur</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-3">
+          <div class="form-group m-2">
+            <label for="timing" class="neon-blue-text"
+              >Durée d'éxécution de chaque calcul en MS
+            </label>
+            <input
+              type="number"
+              class="form-control"
+              id="timing"
+              value="1"
+              onchange="changeTiming()"
+            />
+          </div>
+        </div>
+        <div class="col">
+          <h1 class="text-center">
+            <span class="neon-red-text" id="errorTextZone"></span
+            ><span class="neon-blue-text" id="infoTextZone"></span>
+          </h1>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="addModal" tabindex="-1" role="dialog">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Ajouter une tâche</h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="nomTache">Nom de la tâche</label>
+              <input
+                type="email"
+                class="form-control"
+                id="nomTache"
+                aria-describedby="emailHelp"
+                maxlength="2"
+                required
+              />
+              <small id="emailHelp" class="form-text text-muted"
+                >Le nom de la tâche doit être un caractère unique.</small
+              >
+              <small
+                id="tacheErrorTextZone"
+                class="form-text neon-red-text"
+              ></small>
+            </div>
+
+            <div class="form-group">
+              <label for="dureeTache">Durée de la tâche</label>
+              <input
+                type="number"
+                class="form-control"
+                id="dureeTache"
+                aria-describedby="emailHelp"
+                required
+              />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" onclick="add()">
+              Enregistrer
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-dismiss="modal"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="LinkModal" tabindex="-1" role="dialog">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              Ajouter une tâche anterieur à "<span id="AnteriorTache"></span>"
+            </h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="nomTache">Nom de la tâche anterireur</label>
+              <input
+                type="text"
+                class="form-control"
+                id="nomTacheAnt"
+                maxlength="2"
+                required
+              />
+              <small
+                id="linkErrorTextZone"
+                class="form-text neon-red-text"
+              ></small>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-primary"
+              onclick="addAnteriorTache()"
+            >
+              Enregistrer
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-dismiss="modal"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal" id="dureeModal" tabindex="-1" role="dialog">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              Modifier la durée de la tâche "<span id="nomTacheEdit"></span>"
+            </h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="nomTache">Durée de la tâche </label>
+              <input
+                type="number"
+                class="form-control"
+                id="editDuree"
+                required
+              />
+              <small
+                id="linkErrorTextZone"
+                class="form-text neon-red-text"
+              ></small>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-primary"
+              onclick="editDureeTache()"
+            >
+              Enregistrer
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-dismiss="modal"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/main.js"></script>
+  </body>
+</html>
