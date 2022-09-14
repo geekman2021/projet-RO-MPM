@@ -31,6 +31,8 @@ function add() {
       dureeTache +
       "  </span><a onclick=\"clickEditDureeTache('" +
       nomTache +
+      "', '" +
+      dureeTache +
       "')\"><i class='mdi mdi-pencil neon-green-text-animation'></i></a></td>";
     var TacheAntZone =
       "<td id='TAZ-" +
@@ -124,10 +126,12 @@ function supprimer($var) {
   }
 }
 
-function clickEditDureeTache($var) {
+function clickEditDureeTache($var, $duree) {
   lastAction = $var;
+  console.log(lastAction);
   $("#nomTacheEdit").text($var);
   $("#dureeModal").modal("show");
+  $("#editDuree").val($duree);
 }
 
 function editDureeTache() {
@@ -141,7 +145,6 @@ function editDureeTache() {
 
   $("#DZ-" + keyTache + "-real").text(duree);
   var temp = null;
-  ç;
   for (var i in myDiagram.model.linkDataArray) {
     if (myDiagram.model.linkDataArray[i].from == keyTache) {
       temp = myDiagram.model.linkDataArray[i];
